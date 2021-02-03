@@ -1,0 +1,11 @@
+# This is a dictionary file to generate COPY FROM input, in format
+# used by libfuzzer and honggfuzz
+#
+
+ascii="x"
+validutf8="\xE8\xB1\xA1"
+backslash="\\"
+dot="."
+nl="\x0A"
+cr="\x0D"
+nul="\x00"
