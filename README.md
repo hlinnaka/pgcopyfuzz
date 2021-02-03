@@ -69,3 +69,16 @@ The existing corpus was generated with UTF-8 as the client and server
 encoding. To test other encodings and encoding conversions, you may
 want to edit the dictionary in gencopyfuzz.c, and also run honggfuzz
 yourself with different settings.
+
+
+Tips
+----
+
+By default, copytester sends the input file to the server one byte at a time.
+That's highly inefficient, but useful for finding bugs in the server's
+handling of look-ahead and buffer boundaries. You can adjust the RAW_BUF_SIZE
+constant if you don't want that.
+
+Similarly, it can be very useful to reduce the server's input buffer size,
+by changing the RAW_BUF_SIZE constant in src/include/commands/copyfromparse_internal.h
+in the PostgreSQL source tree.
