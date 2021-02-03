@@ -47,8 +47,8 @@ cmp_string(const void *a, const void *b)
 int
 main(int argc, char **argv)
 {
-	const char *inputdir;
-	const char *conninfo;
+	char	   *path;
+	char	   *conninfo;
 	PGconn	   *conn;
 	DIR		   *dir;
 	struct dirent *de;
@@ -59,52 +59,59 @@ main(int argc, char **argv)
 
 	if (argc < 3)
 	{
-		fprintf(stderr, "usage: copytester <inputdir> <connstring>\n");
+		fprintf(stderr, "usage: copytester <input file or dir> <connstring>\n");
 		exit(1);
 	}
 	
-	inputdir = argv[1];
+	path = argv[1];
 	conninfo = argv[2];
 
-	dir = opendir(inputdir);
-	if (!dir)
+	dir = opendir(path);
+	if (dir)
+	{
+		nallocated=100;
+		filenames = malloc(nallocated * sizeof(char *));
+		if (!filenames)
+		{
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
+		nfiles = 0;
+		while ((de = readdir(dir)) != NULL)
+		{
+			char		fn[1000];
+
+			if (strcmp(de->d_name, ".") == 0 ||
+				strcmp(de->d_name, "..") == 0)
+				continue;
+
+			if (nfiles == nallocated)
+			{
+				nallocated *= 2;
+				filenames = realloc(filenames, nallocated * sizeof(char *));
+				if (!filenames)
+				{
+					fprintf(stderr, "out of memory\n");
+					exit(1);
+				}
+			}
+
+			snprintf(fn, sizeof(fn), "%s/%s", path, de->d_name);
+			filenames[nfiles++] = strdup(fn);
+		}
+		closedir(dir);
+	}
+	else if (errno == ENOTDIR)
+	{
+		filenames = &path;
+		nfiles = 1;
+	}
+	else
 	{
 		fprintf(stderr, "could not open directory \"%s\": %s",
-			inputdir, strerror(errno));
+				path, strerror(errno));
 		exit(1);
 	}
-
-	nallocated=100;
-	filenames = malloc(nallocated * sizeof(char *));
-	if (!filenames)
-	{
-		fprintf(stderr, "out of memory\n");
-		exit(1);
-	}
-	nfiles = 0;
-	while ((de = readdir(dir)) != NULL)
-	{
-		char		fn[1000];
-
-		if (strcmp(de->d_name, ".") == 0 ||
-			strcmp(de->d_name, "..") == 0)
-			continue;
-
-		if (nfiles == nallocated)
-		{
-			nallocated *= 2;
-			filenames = realloc(filenames, nallocated * sizeof(char *));
-			if (!filenames)
-			{
-				fprintf(stderr, "out of memory\n");
-				exit(1);
-			}
-		}
-
-		snprintf(fn, sizeof(fn), "%s/%s", inputdir, de->d_name);
-		filenames[nfiles++] = strdup(fn);
-	}
-	closedir(dir);
 
 	/*
 	 * Sort the filenames, so that you get deterministic output that you
@@ -173,7 +180,6 @@ sendCopyFile(char *path, PGconn *conn)
 	}
 	PQclear(res);
 
-
 	/*
 	 * Send the file to the server.
 	 */
@@ -225,7 +231,7 @@ sendCopyFile(char *path, PGconn *conn)
 		char		*f;
 
 		f = PQresultErrorField(res, PG_DIAG_MESSAGE_PRIMARY);
-		printf("COPY failed: %s\n", f);
+		printf("COPY failed: %s\n", f ? f : "<no message>");
 
 		f = PQresultErrorField(res, PG_DIAG_MESSAGE_DETAIL);
 		if (f)
